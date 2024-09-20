@@ -66,7 +66,7 @@ int main() {
         return 1;
     }
 
-    // Set up destination address (broadcast)
+    
     memset(&dest, 0, sizeof(dest));
     dest.sin_family = AF_INET;
     dest.sin_port = htons(67);  // DHCP server port
@@ -80,7 +80,7 @@ int main() {
         return 1;
     }
 
-    // Send DHCP DISCOVER message
+    
     sendDhcpDiscover(sock, &dest);
 
     close(sock);
