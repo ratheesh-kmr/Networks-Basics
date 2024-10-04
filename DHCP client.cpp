@@ -19,7 +19,7 @@ int main() {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_addr.s_addr = INADDR_ANY;3 b  
 
     // Send DHCP request
     const char *msg = "REQUEST_IP";
