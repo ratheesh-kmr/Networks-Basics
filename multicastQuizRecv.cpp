@@ -1,74 +1,76 @@
 #include <iostream>
-#include <arpa/inet.h>
 #include <cstring>
+#include <cstdlib>
+#include <arpa/inet.h>
 #include <unistd.h>
 
-#define MULTICAST_GROUP "239.0.0.1"
-#define MULTICAST_PORT 12345
-#define BUFFER_SIZE 256
+#define PORT 12345
+#define MULTICAST_GROUP "239.0.0.1"  // Multicast IP address
+#define BUFFER_SIZE 1024
+
+using namespace std;
 
 int main() {
-    int sockfd;
-    struct sockaddr_in local_addr, server_addr;
-    struct ip_mreq multicast_request;
+    int sock;
+    struct sockaddr_in serverAddr;
+    struct ip_mreq multicastRequest;
     char buffer[BUFFER_SIZE];
-    
-    // Create UDP socket for receiving multicast messages
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        std::cerr << "Failed to create socket.\n";
-        return -1;
+
+    // Create a socket for UDP
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
     }
 
-    // Bind to local address
-    memset(&local_addr, 0, sizeof(local_addr));
-    local_addr.sin_family = AF_INET;
-    local_addr.sin_port = htons(MULTICAST_PORT);
-    local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    
-    if (bind(sockfd, (struct sockaddr*)&local_addr, sizeof(local_addr)) < 0) {
-        std::cerr << "Failed to bind socket.\n";
-        return -1;
+    // Zero out the server address struct
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);  // Receive from any address
+    serverAddr.sin_port = htons(PORT);
+
+    // Bind the socket to the multicast port
+    if (bind(sock, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+        perror("Binding failed");
+        close(sock);
+        exit(EXIT_FAILURE);
     }
 
-    // Join multicast group
-    multicast_request.imr_multiaddr.s_addr = inet_addr(MULTICAST_GROUP);
-    multicast_request.imr_interface.s_addr = htonl(INADDR_ANY);
-    if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&multicast_request, sizeof(multicast_request)) < 0) {
-        std::cerr << "Failed to join multicast group.\n";
-        return -1;
+    // Specify the multicast group address and join it
+    multicastRequest.imr_multiaddr.s_addr = inet_addr(MULTICAST_GROUP);
+    multicastRequest.imr_interface.s_addr = htonl(INADDR_ANY);
+    if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*)&multicastRequest, sizeof(multicastRequest)) < 0) {
+        perror("Failed to join multicast group");
+        close(sock);
+        exit(EXIT_FAILURE);
     }
+
+    cout << "Client has joined the multicast group, waiting for quiz questions...\n";
 
     while (true) {
-        // Receive questions
-        int len = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, NULL, 0);
+        // Receive quiz question
+        memset(buffer, 0, BUFFER_SIZE);
+        int len = recvfrom(sock, buffer, BUFFER_SIZE, 0, NULL, 0);
         if (len < 0) {
-            std::cerr << "Failed to receive message.\n";
-            break;
-        }
-        buffer[len] = '\0';
-        std::cout << "Received: " << buffer << "\n";
-
-        // Send answer
-        std::string answer;
-        std::cout << "Enter your answer: ";
-        std::cin >> answer;
-
-        int udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
-        if (udp_sock < 0) {
-            std::cerr << "Failed to create UDP socket.\n";
+            perror("Failed to receive question");
             break;
         }
 
-        memset(&server_addr, 0, sizeof(server_addr));
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(MULTICAST_PORT);
-        server_addr.sin_addr.s_addr = inet_addr(MULTICAST_GROUP);
+        cout << "Received Question: " << buffer << endl;
 
-        sendto(udp_sock, answer.c_str(), answer.size(), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
-        close(udp_sock);
+        // Simulate answering the question
+        cout << "Enter your answer (e.g., A/B/C/D): ";
+        string answer;
+        cin >> answer;
+
+        // Send answer back to the server
+        if (sendto(sock, answer.c_str(), answer.length(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+            perror("Failed to send answer");
+        }
     }
 
-    close(sockfd);
+    // Leave multicast group and close the socket
+    setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void*)&multicastRequest, sizeof(multicastRequest));
+    close(sock);
     return 0;
 }
