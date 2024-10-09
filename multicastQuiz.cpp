@@ -6,7 +6,7 @@
 #include <map>
 
 #define MULTICAST_GROUP "239.0.0.1"  // Multicast address
-#define MULTICAST_PORT 12345         // Multicast port
+#define MULTICAST_PORT 12346        // Multicast port
 #define MAX_TEAMS 5
 #define TIME_TO_ANSWER 10            // Time in seconds
 #define BUFFER_SIZE 256

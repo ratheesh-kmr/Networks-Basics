@@ -58,7 +58,7 @@ int main() {
 
         // Simulate waiting for teams to answer (in a real scenario, wait for client responses here)
         cout << "Waiting for teams to answer...\n";
-        sleep(5);  // Wait 5 seconds before the next round
+        sleep(10);  // Wait 5 seconds before the next round
     }
 
     cout << "Quiz completed. All questions sent.\n";
