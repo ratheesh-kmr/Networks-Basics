@@ -4,7 +4,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#define PORT 12345
+#define PORT 12346
 #define MULTICAST_GROUP "239.0.0.1"  // Multicast IP address
 #define BUFFER_SIZE 1024
 

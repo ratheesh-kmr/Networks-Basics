@@ -1,91 +1,67 @@
 #include <iostream>
-#include <vector>
+#include <cstring>
 #include <cstdlib>
-#include <ctime>
-#include <thread>
-#include <chrono>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+#define PORT 12346
+#define MULTICAST_GROUP "239.0.0.1"  // Multicast IP address
+#define TTL_VALUE 64  // Time-to-Live for multicast packets
+#define BUFFER_SIZE 1024
 
 using namespace std;
 
-class Team {
-public:
-    string name;
-    int score;
-
-    Team(string teamName) {
-        name = teamName;
-        score = 0;
-    }
-
-    void addScore(int marks) {
-        score += marks;
-    }
-};
-
-void multicastQuestion(const string& question, const vector<Team>& teams) {
-    cout << "Multicasting question: " << question << endl;
-    for (const auto& team : teams) {
-        cout << "Team " << team.name << " received the question.\n";
-    }
-    cout << "Waiting for teams to answer...\n";
-    this_thread::sleep_for(chrono::seconds(3));  // Simulating time to answer
-}
-
-bool teamAnswersCorrectly() {
-    return rand() % 2;  // Randomly decide if the answer is correct
-}
-
-void displayScores(const vector<Team>& teams) {
-    cout << "\n--- Final Scores ---" << endl;
-    for (const auto& team : teams) {
-        cout << team.name << ": " << team.score << " points" << endl;
-    }
-}
-
-void startQuiz(int rounds, int timeLimit, int marksPerQuestion) {
-    vector<Team> teams = {Team("A"), Team("B"), Team("C"), Team("D"), Team("E")};
-    srand(time(0));  // Seed random number generator
-
-    // Start quiz rounds
-    for (int round = 1; round <= rounds; round++) {
-        cout << "\n--- Round " << round << " ---\n";
-
-        // Round-robin question distribution
-        for (int i = 0; i < teams.size(); i++) {
-            string question = "[Question " + to_string(round) + " for Team " + teams[i].name + "]";
-            multicastQuestion(question, teams);  // Multicast question
-
-            // Simulate team answering
-            cout << "Team " << teams[i].name << " answering..." << endl;
-            if (teamAnswersCorrectly()) {
-                cout << "Team " << teams[i].name << " answered correctly!\n";
-                teams[i].addScore(marksPerQuestion);
-            } else {
-                cout << "Team " << teams[i].name << " answered incorrectly.\n";
-            }
-
-            // Simulate waiting for the time limit
-            cout << "Time is up for Team " << teams[i].name << "!\n\n";
-        }
-    }
-
-    // Announce final scores
-    displayScores(teams);
-}
-
 int main() {
-    int rounds, timeLimit, marksPerQuestion;
+    int sock;
+    struct sockaddr_in multicastAddr;
+    char buffer[BUFFER_SIZE];
+    int rounds, marksPerQuestion;
 
-    cout << "Welcome to the Multicast e-Quiz!\n";
-    cout << "Enter the number of rounds: ";
+    // Create a socket for UDP
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Zero out the multicast address struct
+    memset(&multicastAddr, 0, sizeof(multicastAddr));
+    multicastAddr.sin_family = AF_INET;
+    multicastAddr.sin_addr.s_addr = inet_addr(MULTICAST_GROUP);  // Multicast address
+    multicastAddr.sin_port = htons(PORT);  // Multicast port
+
+    // Set the TTL for multicast messages
+    unsigned char ttl = TTL_VALUE;
+    if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0) {
+        perror("Setting TTL failed");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
+    // Ask for quiz details
+    cout << "Enter the number of quiz rounds: ";
     cin >> rounds;
-    cout << "Enter time limit per question (in seconds): ";
-    cin >> timeLimit;
     cout << "Enter marks per question: ";
     cin >> marksPerQuestion;
 
-    // Start the quiz
-    startQuiz(rounds, timeLimit, marksPerQuestion);
+    // Start sending questions to multicast group
+    for (int round = 1; round <= rounds; round++) {
+        string question = "Question " + to_string(round) + ": What is the answer to question " + to_string(round) + "?";
+        cout << "Sending: " << question << endl;
 
+        // Send the question to the multicast group
+        if (sendto(sock, question.c_str(), question.length(), 0, (struct sockaddr*)&multicastAddr, sizeof(multicastAddr)) < 0) {
+            perror("Failed to send question");
+            close(sock);
+            exit(EXIT_FAILURE);
+        }
+
+        // Simulate waiting for teams to answer (in a real scenario, wait for client responses here)
+        cout << "Waiting for teams to answer...\n";
+        sleep(5);  // Wait 5 seconds before the next round
+    }
+
+    cout << "Quiz completed. All questions sent.\n";
+    close(sock);
     return 0;
 }
